@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Blood Pressure Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f7f5; --surface: #ffffff; --surface2: #f1f0ee;
+    --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
+    --text: #1a1a18; --text2: #5f5e5a; --text3: #9a9890;
+    --radius-md: 8px; --radius-lg: 14px;
+    --blue: #3266ad; --blue-bg: #e6f1fb; --blue-text: #185FA5;
+    --red: #E24B4A; --amber: #BA7517;
+    --green-text: #3B6D11; --green-bg: #EAF3DE;
+    --amber-bg: #FAEEDA; --amber-text: #854F0B;
+    --red-bg: #FCEBEB; --red-text: #A32D2D;
+    --purple: #1A73E8; --purple-bg: #E8F0FE; --purple-text: #1557B0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --surface: #252523; --surface2: #2e2e2b;
+      --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+      --text: #f0efeb; --text2: #a8a79f; --text3: #6a6965;
+      --blue-bg: #0c2d50; --blue-text: #85b7eb;
+      --green-bg: #173404; --green-text: #97c459;
+      --amber-bg: #412402; --amber-text: #EF9F27;
+      --red-bg: #501313; --red-text: #F09595;
+      --purple-bg: #0d2a5e; --purple-text: #8ab4f8;
+    }
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 1rem; line-height: 1.5; }
+  .container { max-width: 820px; margin: 0 auto; }
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.75rem; flex-wrap: wrap; gap: 12px; }
+  .page-title { font-size: 22px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .page-title svg { width: 24px; height: 24px; stroke: var(--red); fill: none; stroke-width: 2; stroke-linecap: round; }
+  .page-sub { font-size: 13px; color: var(--text2); margin-top: 3px; }
+  .btn { padding: 8px 14px; border-radius: var(--radius-md); border: 1px solid var(--border2); background: transparent; color: var(--text); font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-family: inherit; transition: background 0.15s; }
+  .btn:hover { background: var(--surface2); }
+  .btn:active { transform: scale(0.98); }
+  .btn-export { border-color: #1D9E75; color: #0F6E56; }
+  .btn-export:hover { background: var(--green-bg); }
+  .btn-add { border-color: var(--blue); color: var(--blue-text); }
+  .btn-add:hover { background: var(--blue-bg); }
+  .btn-range { padding: 5px 11px; border-radius: var(--radius-md); border: 1px solid var(--border2); background: transparent; color: var(--text2); font-size: 12px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .btn-range:hover { background: var(--surface2); color: var(--text); }
+  .btn-range.active { background: var(--blue-bg); border-color: var(--blue); color: var(--blue-text); font-weight: 600; }
+  .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .metric-card { background: var(--surface2); border-radius: var(--radius-md); padding: 12px 14px; }
+  .metric-label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+  .metric-value { font-size: 20px; font-weight: 600; color: var(--text); }
+  .metric-unit { font-size: 12px; color: var(--text3); font-weight: 400; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; margin-bottom: 1.25rem; }
+  .card-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
+  .input-row1 { display: grid; grid-template-columns: 1.2fr 0.8fr 1fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 10px; }
+  .input-group { display: flex; flex-direction: column; gap: 4px; }
+  .input-group label { font-size: 12px; color: var(--text2); }
+  .input-group input, .input-group textarea { padding: 8px 10px; border-radius: var(--radius-md); border: 1px solid var(--border2); background: var(--surface2); color: var(--text); font-size: 14px; width: 100%; font-family: inherit; }
+  .input-group input:focus, .input-group textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(50,102,173,0.15); }
+  .input-group textarea { resize: vertical; min-height: 62px; line-height: 1.5; }
+  .tab-bar { display: flex; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; margin-bottom: 1.25rem; }
+  .tab { flex: 1; padding: 9px 10px; background: transparent; border: none; cursor: pointer; font-size: 13px; color: var(--text2); font-family: inherit; transition: background 0.15s; }
+  .tab.active { background: var(--surface2); color: var(--text); font-weight: 600; }
+  .tab:hover:not(.active) { background: var(--surface2); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .chart-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+  .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .range-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+  .custom-range { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .custom-range input { padding: 5px 8px; border-radius: var(--radius-md); border: 1px solid var(--border2); background: var(--surface2); color: var(--text); font-size: 13px; font-family: inherit; }
+  .custom-range label { font-size: 12px; color: var(--text2); white-space: nowrap; }
+  .range-count { font-size: 12px; color: var(--text3); margin-left: 4px; }
+  .log-outer { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .log-head { display: grid; grid-template-columns: 110px 68px 68px 68px 56px 72px 1fr 32px; gap: 6px; padding: 8px 1rem; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--text2); }
+  .log-row { display: grid; grid-template-columns: 110px 68px 68px 68px 56px 72px 1fr 32px; gap: 6px; padding: 9px 1rem; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); align-items: center; }
+  .log-row:last-child { border-bottom: none; }
+  .log-row:hover { background: var(--surface2); }
+  .note-cell { color: var(--text2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .time-cell { font-size: 12px; color: var(--text2); }
+  .week-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .week-table th { text-align: left; padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--text2); border-bottom: 1px solid var(--border); background: var(--surface2); }
+  .week-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text); }
+  .week-table tr:last-child td { border-bottom: none; }
+  .week-table tr:hover td { background: var(--surface2); }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; }
+  .s-normal { background: var(--green-bg); color: var(--green-text); }
+  .s-elevated { background: var(--amber-bg); color: var(--amber-text); }
+  .s-high { background: var(--red-bg); color: var(--red-text); }
+  .s-low { background: var(--blue-bg); color: var(--blue-text); }
+  .btn-del { background: none; border: none; cursor: pointer; color: var(--text3); padding: 4px 6px; border-radius: 5px; font-size: 15px; line-height: 1; }
+  .btn-del:hover { color: var(--red); background: var(--red-bg); }
+  .empty { text-align: center; padding: 2.5rem; color: var(--text3); font-size: 14px; }
+  .trend-up { color: var(--red-text); } .trend-down { color: var(--green-text); } .trend-same { color: var(--text3); }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--surface); padding: 9px 18px; border-radius: var(--radius-md); font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; }
+  .toast.show { opacity: 1; }
+
+  /* AI styles */
+  .ai-card { background: var(--surface); border: 1.5px solid var(--purple); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1.25rem; position: relative; overflow: hidden; }
+  .ai-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #4285F4, #34A853, #FBBC05, #EA4335); }
+  .ai-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  .ai-title { font-size: 15px; font-weight: 600; color: var(--purple-text); display: flex; align-items: center; gap: 7px; }
+  .ai-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .ai-range-label { font-size: 12px; color: var(--text2); }
+  .ai-range-select { padding: 5px 8px; border-radius: var(--radius-md); border: 1px solid var(--border2); background: var(--surface2); color: var(--text); font-size: 12px; font-family: inherit; cursor: pointer; }
+  .btn-ai { padding: 8px 16px; border-radius: var(--radius-md); border: 1.5px solid var(--purple); background: var(--purple-bg); color: var(--purple-text); font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; transition: all 0.15s; }
+  .btn-ai:hover { background: var(--purple); color: #fff; }
+  .btn-ai:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ai-body { font-size: 14px; color: var(--text); line-height: 1.8; }
+  .ai-body h3 { font-size: 13px; font-weight: 700; color: var(--purple-text); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .ai-body p { margin-bottom: 10px; }
+  .ai-body ul { padding-left: 20px; margin-bottom: 10px; }
+  .ai-body li { margin-bottom: 6px; }
+  .ai-placeholder { color: var(--text3); font-size: 14px; text-align: center; padding: 1.5rem 0; }
+  .ai-disclaimer { font-size: 11px; color: var(--text3); margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--purple-text); margin: 0 2px; animation: blink 1.2s infinite; }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
+  .api-key-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .api-key-row input { flex: 1; padding: 7px 10px; border-radius: var(--radius-md); border: 1px solid var(--border2); background: var(--surface2); color: var(--text); font-size: 13px; font-family: inherit; min-width: 200px; }
+  .api-key-row input:focus { outline: none; border-color: var(--purple); }
+  .api-key-note { font-size: 11px; color: var(--text3); margin-bottom: 12px; }
+  .api-key-note a { color: var(--purple-text); }
+  .gemini-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; background: var(--purple-bg); color: var(--purple-text); border-radius: 99px; font-weight: 600; margin-left: 6px; }
+
+  @media (max-width: 640px) {
+    .input-row1 { grid-template-columns: 1fr 1fr; }
+    .input-row1 > *:nth-child(1), .input-row1 > *:nth-child(2), .input-row1 > *:nth-child(6) { grid-column: 1 / -1; }
+    .log-head, .log-row { grid-template-columns: 90px 55px 55px 55px 50px 65px 0 28px; font-size: 12px; }
+    .note-cell, .log-head span:nth-child(7) { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="page-header">
+    <div>
+      <div class="page-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Blood Pressure Tracker
+      </div>
+      <div class="page-sub">Log daily readings · track trends · AI insights · export data</div>
+    </div>
+    <button class="btn btn-export" onclick="exportCSV()">&#8659; Export CSV</button>
+  </div>
+
+  <div class="metric-grid">
+    <div class="metric-card"><div class="metric-label">Latest systolic</div><div class="metric-value" id="latestSys">—</div></div>
+    <div class="metric-card"><div class="metric-label">Latest diastolic</div><div class="metric-value" id="latestDia">—</div></div>
+    <div class="metric-card"><div class="metric-label">Latest pulse</div><div class="metric-value" id="latestPul">—</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Add reading</div>
+    <div class="input-row1">
+      <div class="input-group"><label>Date</label><input type="date" id="inDate" /></div>
+      <div class="input-group"><label>Time</label><input type="time" id="inTime" /></div>
+      <div class="input-group"><label>Systolic (mmHg)</label><input type="number" id="inSys" placeholder="120" min="60" max="250" /></div>
+      <div class="input-group"><label>Diastolic (mmHg)</label><input type="number" id="inDia" placeholder="80" min="40" max="150" /></div>
+      <div class="input-group"><label>Pulse (bpm)</label><input type="number" id="inPul" placeholder="72" min="30" max="200" /></div>
+      <button class="btn btn-add" onclick="addReading()">+ Add</button>
+    </div>
+    <div class="input-group">
+      <label>Notes (optional)</label>
+      <textarea id="inNote" placeholder="e.g. morning reading, after exercise, felt stressed, took medication…"></textarea>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('trend')">&#9654; Trend</button>
+    <button class="tab" onclick="switchTab('weekly')">&#8776; Weekly</button>
+    <button class="tab" onclick="switchTab('log')">&#9776; Log</button>
+    <button class="tab" onclick="switchTab('ai')">✨ AI Insights</button>
+  </div>
+
+  <!-- TREND -->
+  <div id="tab-trend" class="tab-content active">
+    <div class="card" style="margin-bottom:0">
+      <div class="chart-controls">
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-dot" style="background:#3266ad"></span> Systolic</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#E24B4A"></span> Diastolic</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#BA7517"></span> Pulse</span>
+        </div>
+        <div class="range-btns">
+          <button class="btn-range" onclick="setRange('7',this)">7d</button>
+          <button class="btn-range" onclick="setRange('14',this)">14d</button>
+          <button class="btn-range" onclick="setRange('30',this)">30d</button>
+          <button class="btn-range" onclick="setRange('90',this)">90d</button>
+          <button class="btn-range active" onclick="setRange('all',this)">All</button>
+          <button class="btn-range" onclick="setRange('custom',this)">Custom</button>
+        </div>
+      </div>
+      <div class="custom-range" id="customRange" style="display:none">
+        <label>From</label><input type="date" id="rangeFrom" onchange="applyCustomRange()" />
+        <label>To</label><input type="date" id="rangeTo" onchange="applyCustomRange()" />
+        <span class="range-count" id="rangeCount"></span>
+      </div>
+      <div style="position:relative;width:100%;height:300px;margin-top:12px;">
+        <canvas id="bpChart">Add readings to see your trend.</canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- WEEKLY -->
+  <div id="tab-weekly" class="tab-content">
+    <div class="log-outer">
+      <table class="week-table">
+        <thead><tr><th>Week</th><th>Avg systolic</th><th>Avg diastolic</th><th>Avg pulse</th><th>Readings</th><th>Status</th><th>vs prev</th></tr></thead>
+        <tbody id="weekBody"><tr><td colspan="7" class="empty">No data yet.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div id="tab-log" class="tab-content">
+    <div class="log-outer">
+      <div class="log-head">
+        <span>Date</span><span>Time</span><span>Systolic</span><span>Diastolic</span><span>Pulse</span><span>Status</span><span>Notes</span><span></span>
+      </div>
+      <div id="logBody"><div class="empty">No readings yet.</div></div>
+    </div>
+  </div>
+
+  <!-- AI INSIGHTS -->
+  <div id="tab-ai" class="tab-content">
+    <div class="ai-card">
+      <div class="ai-header">
+        <div class="ai-title">
+          ✨ AI Health Insights
+          <span class="gemini-badge">Google Gemini · Free</span>
+        </div>
+        <div class="ai-controls">
+          <span class="ai-range-label">Analyse:</span>
+          <select class="ai-range-select" id="aiRangeSelect">
+            <option value="14">Last 14 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="all">All data</option>
+          </select>
+          <button class="btn-ai" id="btnAnalyse" onclick="runAnalysis()">✨ Analyse my data</button>
+        </div>
+      </div>
+
+      <div class="api-key-row">
+        <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key" autocomplete="off" />
+        <button class="btn" onclick="saveApiKey()">Save key</button>
+        <button class="btn" onclick="clearApiKey()" style="color:var(--text3)">Clear</button>
+      </div>
+      <div class="api-key-note">
+        Get a free key at <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a> → Get API key → Create API key. Paste the full key exactly as shown.
+        Your key is saved only in this browser and sent only to Google's API.
+      </div>
+
+      <div id="aiOutput">
+        <div class="ai-placeholder">Enter your Gemini API key above, then click "Analyse my data" to get friendly lifestyle insights based on your readings and notes.</div>
+      </div>
+      <div class="ai-disclaimer">⚠️ These insights are for general wellness guidance only and are not medical advice. Always consult your doctor about blood pressure concerns.</div>
+    </div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'bp_readings_v3';
+const API_KEY_STORAGE = 'bp_gemini_api_key';
+let readings = [];
+let chart = null;
+let currentRange = 'all';
+let customFrom = '';
+let customTo = '';
+
+function loadData() {
+  try { const r = localStorage.getItem(STORAGE_KEY); if (r) readings = JSON.parse(r); } catch(e) { readings = []; }
+  readings = readings.map(r => ({ time: '', note: '', ...r }));
+}
+function saveData() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(readings)); } catch(e) {} }
+function getStatus(sys, dia) {
+  if (sys < 90 || dia < 60) return { label: 'Low', cls: 's-low' };
+  if (sys < 120 && dia < 80) return { label: 'Normal', cls: 's-normal' };
+  if (sys < 130 && dia < 80) return { label: 'Elevated', cls: 's-elevated' };
+  return { label: 'High', cls: 's-high' };
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+function switchTab(name) {
+  ['trend','weekly','log','ai'].forEach((n,i) => {
+    document.querySelectorAll('.tab')[i].classList.toggle('active', n===name);
+    document.getElementById('tab-'+n).classList.toggle('active', n===name);
+  });
+}
+
+// Range filter
+function setRange(range, btn) {
+  currentRange = range;
+  document.querySelectorAll('.btn-range').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const customEl = document.getElementById('customRange');
+  if (range === 'custom') {
+    customEl.style.display = 'flex';
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('rangeTo').value = customTo || today;
+    if (!customFrom) { const d = new Date(); d.setDate(d.getDate()-30); document.getElementById('rangeFrom').value = d.toISOString().split('T')[0]; }
+    else document.getElementById('rangeFrom').value = customFrom;
+    applyCustomRange();
+  } else { customEl.style.display = 'none'; renderChart(); }
+}
+function applyCustomRange() {
+  customFrom = document.getElementById('rangeFrom').value;
+  customTo = document.getElementById('rangeTo').value;
+  renderChart();
+}
+function getFilteredReadings() {
+  if (currentRange === 'all') return readings;
+  if (currentRange === 'custom') return readings.filter(r => (!customFrom || r.date >= customFrom) && (!customTo || r.date <= customTo));
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-parseInt(currentRange));
+  return readings.filter(r => r.date >= cutoff.toISOString().split('T')[0]);
+}
+
+// CRUD
+function addReading() {
+  const date = document.getElementById('inDate').value;
+  const time = document.getElementById('inTime').value;
+  const sys = parseInt(document.getElementById('inSys').value);
+  const dia = parseInt(document.getElementById('inDia').value);
+  const pul = parseInt(document.getElementById('inPul').value);
+  const note = document.getElementById('inNote').value.trim();
+  if (!date) { showToast('Please select a date'); return; }
+  if (!sys || sys<60 || sys>250) { showToast('Enter a valid systolic (60–250)'); return; }
+  if (!dia || dia<40 || dia>150) { showToast('Enter a valid diastolic (40–150)'); return; }
+  if (!pul || pul<30 || pul>200) { showToast('Enter a valid pulse (30–200)'); return; }
+  const key = date+'T'+(time||'00:00');
+  const idx = readings.findIndex(r => (r.date+'T'+(r.time||'00:00'))===key);
+  const entry = { date, time, sys, dia, pul, note };
+  if (idx>=0) readings[idx]=entry; else readings.push(entry);
+  readings.sort((a,b) => (a.date+'T'+(a.time||'00:00')).localeCompare(b.date+'T'+(b.time||'00:00')));
+  saveData(); render();
+  ['inSys','inDia','inPul','inNote'].forEach(id => document.getElementById(id).value='');
+  showToast('Reading saved ✓');
+}
+function deleteReading(key) {
+  readings = readings.filter(r => (r.date+'T'+(r.time||'00:00'))!==key);
+  saveData(); render(); showToast('Reading deleted');
+}
+
+// Helpers
+function formatDate(d) {
+  const [y,m,day]=d.split('-');
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]+' '+parseInt(day);
+}
+function formatTime(t) {
+  if (!t) return '—';
+  const [h,m]=t.split(':'); const hr=parseInt(h);
+  return `${hr%12||12}:${m} ${hr<12?'AM':'PM'}`;
+}
+function getWeekKey(dateStr) {
+  const d=new Date(dateStr+'T00:00:00'); const day=d.getDay();
+  const diff=d.getDate()-day+(day===0?-6:1);
+  return new Date(new Date(dateStr+'T00:00:00').setDate(diff)).toISOString().split('T')[0];
+}
+function getWeekLabel(wk) {
+  const [y,m,day]=wk.split('-');
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const end=new Date(wk+'T00:00:00'); end.setDate(end.getDate()+6);
+  return `${months[parseInt(m)-1]} ${parseInt(day)} – ${months[end.getMonth()]} ${end.getDate()}`;
+}
+function computeWeekly() {
+  const weeks={};
+  readings.forEach(r=>{
+    const wk=getWeekKey(r.date);
+    if(!weeks[wk]) weeks[wk]={sys:[],dia:[],pul:[]};
+    weeks[wk].sys.push(r.sys); weeks[wk].dia.push(r.dia); weeks[wk].pul.push(r.pul);
+  });
+  return Object.keys(weeks).sort().map(wk=>({
+    label:getWeekLabel(wk),
+    avgSys:Math.round(weeks[wk].sys.reduce((a,b)=>a+b,0)/weeks[wk].sys.length),
+    avgDia:Math.round(weeks[wk].dia.reduce((a,b)=>a+b,0)/weeks[wk].dia.length),
+    avgPul:Math.round(weeks[wk].pul.reduce((a,b)=>a+b,0)/weeks[wk].pul.length),
+    count:weeks[wk].sys.length
+  }));
+}
+function trendArrow(curr,prev) {
+  if(prev===null) return '<span class="trend-same">—</span>';
+  const diff=curr-prev;
+  if(diff>2) return `<span class="trend-up">&#8679; +${diff}</span>`;
+  if(diff<-2) return `<span class="trend-down">&#8681; ${diff}</span>`;
+  return `<span class="trend-same">&#8776; ${diff>0?'+':''}${diff}</span>`;
+}
+
+// Export
+function exportCSV() {
+  if(!readings.length){showToast('No data to export');return;}
+  const header='Date,Time,Systolic (mmHg),Diastolic (mmHg),Pulse (bpm),Status,Notes';
+  const rows=readings.map(r=>{
+    const st=getStatus(r.sys,r.dia);
+    return `${r.date},${r.time||''},${r.sys},${r.dia},${r.pul},${st.label},"${(r.note||'').replace(/"/g,'""')}"`;
+  });
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([[header,...rows].join('\n')],{type:'text/csv'}));
+  a.download=`blood_pressure_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+  showToast('CSV exported ✓');
+}
+
+// API Key
+function saveApiKey() {
+  const key=document.getElementById('apiKeyInput').value.trim();
+  if(!key || key.length < 10){showToast('Please enter a valid API key');return;}
+  localStorage.setItem(API_KEY_STORAGE,key);
+  document.getElementById('apiKeyInput').value='••••••••••••••••';
+  showToast('API key saved ✓');
+}
+function clearApiKey() {
+  localStorage.removeItem(API_KEY_STORAGE);
+  document.getElementById('apiKeyInput').value='';
+  showToast('API key cleared');
+}
+function getApiKey(){ return localStorage.getItem(API_KEY_STORAGE)||''; }
+
+// AI Analysis using Gemini
+async function runAnalysis() {
+  const apiKey=getApiKey();
+  if(!apiKey){showToast('Please enter your Gemini API key first');document.getElementById('apiKeyInput').focus();return;}
+  if(!readings.length){showToast('No readings to analyse yet');return;}
+
+  const rangeVal=document.getElementById('aiRangeSelect').value;
+  let subset=readings;
+  if(rangeVal!=='all'){
+    const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-parseInt(rangeVal));
+    subset=readings.filter(r=>r.date>=cutoff.toISOString().split('T')[0]);
+  }
+  if(!subset.length){showToast('No readings in selected range');return;}
+
+  const btn=document.getElementById('btnAnalyse');
+  btn.disabled=true; btn.innerHTML='✨ Analysing…';
+  document.getElementById('aiOutput').innerHTML=`<div style="padding:1rem 0;color:var(--text2);font-size:14px;"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>&nbsp; Reading your data and thinking…</div>`;
+
+  const avg=arr=>Math.round(arr.reduce((a,b)=>a+b,0)/arr.length);
+  const avgSys=avg(subset.map(r=>r.sys));
+  const avgDia=avg(subset.map(r=>r.dia));
+  const avgPul=avg(subset.map(r=>r.pul));
+  const maxSys=Math.max(...subset.map(r=>r.sys));
+  const minSys=Math.min(...subset.map(r=>r.sys));
+  const notes=subset.filter(r=>r.note).map(r=>`${r.date} ${r.time||''}: ${r.note}`).join('\n');
+  const half=Math.floor(subset.length/2);
+  const trendSys=half>0?(avg(subset.slice(half).map(r=>r.sys))-avg(subset.slice(0,half).map(r=>r.sys))):0;
+  const morning=subset.filter(r=>{const h=parseInt((r.time||'12:00').split(':')[0]);return h>=5&&h<12;});
+  const evening=subset.filter(r=>{const h=parseInt((r.time||'12:00').split(':')[0]);return h>=17||h<5;});
+
+  const prompt=`You are a friendly wellness companion helping someone understand their blood pressure readings. Speak warmly and encouragingly — like a knowledgeable friend, not a doctor. Keep it practical and non-clinical.
+
+Blood pressure data (${subset.length} readings over selected period):
+
+SUMMARY:
+- Average: ${avgSys}/${avgDia} mmHg, pulse ${avgPul} bpm
+- Range: Systolic ${minSys}–${maxSys} mmHg
+- Recent trend: Systolic has ${trendSys>3?'gone up by ~'+trendSys+' mmHg':trendSys<-3?'gone down by ~'+Math.abs(trendSys)+' mmHg (great!)':'stayed fairly stable'}
+${morning.length?`- Morning avg (${morning.length} readings): ${avg(morning.map(r=>r.sys))}/${avg(morning.map(r=>r.dia))} mmHg`:''}
+${evening.length?`- Evening avg (${evening.length} readings): ${avg(evening.map(r=>r.sys))}/${avg(evening.map(r=>r.dia))} mmHg`:''}
+
+RECENT READINGS (last 10):
+${subset.slice(-10).map(r=>`${r.date} ${r.time||''}: ${r.sys}/${r.dia} mmHg, pulse ${r.pul}${r.note?' — note: '+r.note:''}`).join('\n')}
+
+${notes?'USER NOTES:\n'+notes:''}
+
+Please provide:
+### What I notice
+A friendly 2-3 sentence summary of their overall pattern.
+
+### Patterns in your data
+Any patterns around time of day, days with notes, spikes or dips.
+
+### Lifestyle tips to try
+4-6 simple, practical everyday suggestions — sleep, hydration, breathing, stress, movement, food. Short and actionable.
+
+### Something positive
+One encouraging thing you notice in their data.
+
+Keep it warm, concise, and friendly. No medication advice. No "see a doctor" reminders.`;
+
+  try {
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        contents:[{parts:[{text:prompt}]}],
+        generationConfig:{maxOutputTokens:1000,temperature:0.7}
+      })
+    });
+    if(!res.ok){
+      const err=await res.json();
+      throw new Error(err.error?.message||'API error '+res.status);
+    }
+    const data=await res.json();
+    const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'No response received.';
+
+    // Convert markdown to HTML
+    const html=text
+      .replace(/### (.+)/g,'<h3>$1</h3>')
+      .replace(/## (.+)/g,'<h3>$1</h3>')
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g,'<em>$1</em>')
+      .replace(/^- (.+)/gm,'<li>$1</li>')
+      .replace(/(<li>[^]*?<\/li>(\n|$))+/g,'<ul>$&</ul>')
+      .split('\n\n').map(p=>p.startsWith('<')?p:`<p>${p}</p>`).join('');
+
+    document.getElementById('aiOutput').innerHTML=`<div class="ai-body">${html}</div>`;
+  } catch(e) {
+    document.getElementById('aiOutput').innerHTML=`<div class="ai-placeholder" style="color:var(--red-text)">❌ Error: ${e.message}<br><br>Please check your API key and try again.</div>`;
+  }
+  btn.disabled=false; btn.innerHTML='✨ Analyse again';
+}
+
+// Render
+function render() {
+  const latest=readings[readings.length-1];
+  if(latest){
+    document.getElementById('latestSys').textContent=latest.sys+' mmHg';
+    document.getElementById('latestDia').textContent=latest.dia+' mmHg';
+    document.getElementById('latestPul').innerHTML=latest.pul+' <span class="metric-unit">bpm</span>';
+  } else { ['latestSys','latestDia','latestPul'].forEach(id=>document.getElementById(id).textContent='—'); }
+  renderChart(); renderWeekly(); renderLog();
+}
+function renderChart() {
+  if(chart){chart.destroy();chart=null;}
+  const filtered=getFilteredReadings();
+  if(currentRange==='custom') document.getElementById('rangeCount').textContent=filtered.length?`${filtered.length} readings`:'No readings in range';
+  if(!filtered.length) return;
+  const sysData=filtered.map(r=>r.sys), diaData=filtered.map(r=>r.dia), pulData=filtered.map(r=>r.pul);
+  chart=new Chart(document.getElementById('bpChart').getContext('2d'),{
+    type:'line',
+    data:{labels:filtered.map(r=>formatDate(r.date)+(r.time?' '+formatTime(r.time):'')),datasets:[
+      {label:'Systolic',data:sysData,borderColor:'#3266ad',backgroundColor:'rgba(50,102,173,0.07)',borderWidth:2,pointRadius:5,pointBackgroundColor:'#3266ad',tension:0.3,fill:false},
+      {label:'Diastolic',data:diaData,borderColor:'#E24B4A',borderDash:[5,4],backgroundColor:'rgba(226,75,74,0.05)',borderWidth:2,pointRadius:5,pointStyle:'rectRot',pointBackgroundColor:'#E24B4A',tension:0.3,fill:false},
+      {label:'Pulse',data:pulData,borderColor:'#BA7517',backgroundColor:'rgba(186,117,23,0.05)',borderWidth:2,pointRadius:5,pointStyle:'triangle',pointBackgroundColor:'#BA7517',tension:0.3,fill:false}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y}${c.dataset.label==='Pulse'?' bpm':' mmHg'}`}}},
+      scales:{
+        x:{ticks:{autoSkip:true,maxTicksLimit:12,maxRotation:45,font:{size:11},color:'#888780'},grid:{color:'rgba(136,135,128,0.12)'}},
+        y:{min:Math.max(40,Math.min(...diaData,...pulData)-15),max:Math.max(...sysData)+15,ticks:{font:{size:11},color:'#888780'},grid:{color:'rgba(136,135,128,0.12)'}}
+      }
+    }
+  });
+}
+function renderWeekly() {
+  const weekBody=document.getElementById('weekBody');
+  const weeks=computeWeekly();
+  if(!weeks.length){weekBody.innerHTML='<tr><td colspan="7" class="empty">No data yet.</td></tr>';return;}
+  weekBody.innerHTML=[...weeks].reverse().map((wk,i,arr)=>{
+    const prev=arr[i+1]||null; const st=getStatus(wk.avgSys,wk.avgDia);
+    return `<tr><td><strong>${wk.label}</strong></td><td>${wk.avgSys}</td><td>${wk.avgDia}</td><td>${wk.avgPul}</td><td style="color:var(--text2)">${wk.count} reading${wk.count>1?'s':''}</td><td><span class="badge ${st.cls}">${st.label}</span></td><td>${trendArrow(wk.avgSys,prev?prev.avgSys:null)}</td></tr>`;
+  }).join('');
+}
+function renderLog() {
+  const logBody=document.getElementById('logBody');
+  if(!readings.length){logBody.innerHTML='<div class="empty">No readings yet.</div>';return;}
+  logBody.innerHTML=[...readings].reverse().map(r=>{
+    const st=getStatus(r.sys,r.dia);
+    const key=(r.date+'T'+(r.time||'00:00')).replace(/'/g,'');
+    return `<div class="log-row">
+      <span><strong>${formatDate(r.date)}</strong></span>
+      <span class="time-cell">${formatTime(r.time)}</span>
+      <span>${r.sys} mmHg</span><span>${r.dia} mmHg</span><span>${r.pul}</span>
+      <span><span class="badge ${st.cls}">${st.label}</span></span>
+      <span class="note-cell" title="${(r.note||'').replace(/"/g,'&quot;')}">${r.note||'—'}</span>
+      <button class="btn-del" onclick="deleteReading('${key}')" aria-label="Delete">&#10005;</button>
+    </div>`;
+  }).join('');
+}
+
+// Init
+const now=new Date();
+document.getElementById('inDate').value=now.toISOString().split('T')[0];
+document.getElementById('inDate').max=now.toISOString().split('T')[0];
+document.getElementById('inTime').value=now.toTimeString().slice(0,5);
+if(getApiKey()) document.getElementById('apiKeyInput').value='••••••••••••••••';
+loadData(); render();
+</script>
+</body>
+</html>
